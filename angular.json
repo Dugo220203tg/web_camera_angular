@@ -27,9 +27,13 @@
               }
             ],
             "styles": [
-              "src/styles.css"
+                "src/styles.css",
+                "node_modules/video.js/dist/video-js.min.css"
             ],
-            "scripts": []
+            "scripts": [
+                    "node_modules/video.js/dist/video.js",
+                    "node_modules/@videojs/http-streaming/dist/videojs-http-streaming.min.js"         
+            ]
           },
           "configurations": {
             "production": {
@@ -92,5 +96,8 @@
         }
       }
     }
+  },
+  "cli": {
+    "analytics": false
   }
 }
