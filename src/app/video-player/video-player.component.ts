@@ -21,7 +21,7 @@ import '@videojs/http-streaming';
         <button (click)="zoomCamera('out')">Zoom Out</button>
         <button (click)="stopCamera()">Stop</button>
       </div>
-      <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>
+      <div *ngIf="statusMessage" [class]="statusMessageClass">{{ statusMessage }}</div>
     </div>
   `,
   styles: [
@@ -37,10 +37,15 @@ import '@videojs/http-streaming';
       justify-content: center;
       gap: 10px;
     }
-    .error-message {
-      color: red;
+    .status-message {
       margin-top: 10px;
       text-align: center;
+    }
+    .error-message {
+      color: red;
+    }
+    .success-message {
+      color: green;
     }
     `
   ]
@@ -48,7 +53,8 @@ import '@videojs/http-streaming';
 export class VideoPlayerComponent implements OnInit, OnDestroy {
   private player: any;
   private apiUrl = 'http://localhost:5115/api/Stream';
-  errorMessage: string = '';
+  statusMessage: string = '';
+  statusMessageClass: string = '';
 
   @ViewChild('videoPlayer', { static: true }) videoElement!: ElementRef<HTMLVideoElement>;
   constructor(private http: HttpClient) {}
@@ -94,13 +100,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   }
 
   controlCamera(direction: string) {
-    this.errorMessage = ''; // Reset error message
-    this.http.post<any>(`${this.apiUrl}/control/${direction}`, {}).subscribe(
+    this.clearStatusMessage();
+    this.http.post(`${this.apiUrl}/control/${direction}`, {}, { responseType: 'text' }).subscribe(
       response => {
         console.log(`Camera moved ${direction}`, response);
-        if (response && (response as any).error) {
-          this.handleError(new HttpErrorResponse({ error: (response as any).error, status: 200 }), `Error moving camera ${direction}`);
-        }
+        this.setStatusMessage(`Camera moved ${direction}`, 'success');
       },
       (error: HttpErrorResponse) => {
         this.handleError(error, `Error moving camera ${direction}`);
@@ -109,13 +113,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   }
 
   zoomCamera(operation: string) {
-    this.errorMessage = ''; // Reset error message
-    this.http.post<any>(`${this.apiUrl}/zoom/${operation}`, {}).subscribe(
+    this.clearStatusMessage();
+    this.http.post(`${this.apiUrl}/zoom/${operation}`, {}, { responseType: 'text' }).subscribe(
       response => {
         console.log(`Camera zoomed ${operation}`, response);
-        if (response && (response as any).error) {
-          this.handleError(new HttpErrorResponse({ error: (response as any).error, status: 200 }), `Error zooming camera ${operation}`);
-        }
+        this.setStatusMessage(`Camera zoomed ${operation}`, 'success');
       },
       (error: HttpErrorResponse) => {
         this.handleError(error, `Error zooming camera ${operation}`);
@@ -124,12 +126,11 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   }
 
   stopCamera() {
-    this.http.post<any>(`${this.apiUrl}/stop`, {}).subscribe(
+    this.clearStatusMessage();
+    this.http.post(`${this.apiUrl}/stop`, {}, { responseType: 'text' }).subscribe(
       response => {
         console.log('Camera stopped', response);
-        if (response && (response as any).error) {
-          this.handleError(new HttpErrorResponse({ error: (response as any).error, status: 200 }), 'Error stopping camera');
-        }
+        this.setStatusMessage('Camera stopped', 'success');
       },
       (error: HttpErrorResponse) => {
         this.handleError(error, 'Error stopping camera');
@@ -138,17 +139,26 @@ export class VideoPlayerComponent implements OnInit, OnDestroy {
   }
 
   private handleError(error: HttpErrorResponse, defaultMessage: string) {
+    console.error(defaultMessage, error);
     if (error.error instanceof ErrorEvent) {
-      // Client-side or network error
-      this.errorMessage = error.error.message;
+      // Client-side or network error occurred
+      this.setStatusMessage(`An error occurred: ${error.error.message}`, 'error');
+    } else if (error.status === 200 && typeof error.error === 'string') {
+      // Server might have returned a non-JSON response with status 200
+      this.setStatusMessage(error.error || defaultMessage, 'success');
     } else {
       // Backend returned an unsuccessful response code
-      try {
-        this.errorMessage = `Server returned code ${error.status}, message: ${JSON.stringify(error.error)}`;
-      } catch (e) {
-        this.errorMessage = `Server returned code ${error.status}, message: ${error.error}`;
-      }
+      this.setStatusMessage(`${defaultMessage}: ${error.status} ${error.statusText}`, 'error');
     }
-    console.error(defaultMessage, error);
+  }
+
+  private setStatusMessage(message: string, type: 'error' | 'success') {
+    this.statusMessage = message;
+    this.statusMessageClass = type === 'error' ? 'error-message' : 'success-message';
+  }
+
+  private clearStatusMessage() {
+    this.statusMessage = '';
+    this.statusMessageClass = '';
   }
 }
